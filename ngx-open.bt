@@ -1,0 +1,10 @@
+#!/usr/bin/bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_open_file_wrapper
+{
+    //$name =  str(uptr(arg1));
+    cat("/proc/%d/cmdline", pid);
+    printf(" %d at %s \n %s\n",
+             pid, strftime("%H:%M:%S", nsecs), ustack());
+
+}

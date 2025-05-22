@@ -1,0 +1,9 @@
+#!/usr/bin/bpftrace
+ 
+uprobe:/usr/sbin/nginx:ngx_shmtx_lock /comm == "nginx"/
+{   
+        cat("/proc/%d/cmdline", pid); 
+        printf("\n %s %s %s\n",
+                strftime("%H:%M:%S", nsecs),probe, ustack(3));
+
+}

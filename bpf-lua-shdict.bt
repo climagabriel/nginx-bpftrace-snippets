@@ -1,0 +1,7 @@
+#!/usr/bin/bpftrace 
+
+uprobe:/usr/sbin/nginx:ngx_http_lua_ffi_shdict*
+{
+    printf("%d %s %s \n", pid, comm, probe);
+}
+

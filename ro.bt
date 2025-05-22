@@ -1,0 +1,30 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_openat /comm == "nginx"/
+{
+	@filename[tid] = args->filename;
+}
+
+tracepoint:syscalls:sys_exit_openat /@filename[tid]/
+{
+	$ret = args->ret;
+	$fd = $ret >= 0 ? $ret : -1;
+	$errno = $ret >= 0 ? 0 : - $ret;
+
+    printf("open %s  err:%d \n", str(@filename[tid]), $errno);
+
+	delete(@filename[tid]);
+
+}
+
+tracepoint:syscalls:sys_enter_unlink* /comm == "nginx"/
+{
+	printf("%s %s:%d %s %s\n",
+    probe, comm, pid, str(args->pathname), strftime("%H:%M:%S:%f",nsecs));
+}
+
+tracepoint:syscalls:sys_enter_rename* /comm == "nginx"/
+{
+	printf("rename %s %s\n",
+     str(args->oldname), str(args->newname) );
+}

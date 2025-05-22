@@ -1,0 +1,10 @@
+#!/usr/bin/bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_http_lua_ffi_shdict_get /comm == "nginx"/
+{
+    //$ptr = (u64)arg4;  // Assuming arg1 is your u_char **
+    //$str = str(*((char **)$ptr));A
+    printf("%s %d Content: %s\n", strftime("%H:%M:%S", nsecs), pid, str(*arg4));
+}
+
+

@@ -1,0 +1,13 @@
+#!/usr/bin/bpftrace
+
+kprobe:do_sys_openat2
+{
+ $name = str(uptr(arg1));
+ $cmp = strncmp($name, "/dev/shm/cdn-agent/certs_puppet/gcdn.co/gcdn.co.crt", 52);
+ if ( $cmp == 0 )
+ {
+ cat("/proc/%d/cmdline", pid);
+ printf(" %d opened file: %s at %s \n", pid, $name, strftime("%H:%M:%S", nsecs));
+ }
+}
+

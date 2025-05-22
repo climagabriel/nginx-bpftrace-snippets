@@ -1,0 +1,20 @@
+#!/usr/bin/bpftrace
+#include <uapi/linux/openat2.h> 
+
+
+
+kprobe:do_sys_openat2
+{
+
+    $name =  str(uptr(arg1));
+    $open_how = (struct open_how *)arg2;
+    $flags = $open_how->flags;
+
+    //$cmp =  strncmp($name, "/etc/cdn-agent/private.pem", 27);
+    //$cmp =  strncmp($name, "/var/lib/cdn-agent/lmdb-cdn-config/data.mdb", 44);
+    $cmp =  strncmp($name, "/etc/nginx/sites-available/default-agent.conf", 46);
+    if ( $cmp == 0 ) {
+    cat("/proc/%d/cmdline", pid);
+    printf(" %d opened file: %s at %s %d %llu\n", pid, $name, strftime("%H:%M:%S", nsecs), $open_how->mode, $flags);
+    }
+}

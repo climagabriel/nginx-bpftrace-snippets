@@ -1,0 +1,14 @@
+#!/usr/bin/bpftrace
+
+
+tracepoint:block:block_bio_queue /pid == $1/
+{
+	//@start[args->sector] = nsecs;
+    printf("%d %d %s\n", pid, args->sector, probe);
+}
+
+tracepoint:block:block_rq_complete,
+tracepoint:block:block_bio_complete /pid == $1/
+{
+    printf("%d %d %s\n", pid, args->sector, probe);
+}

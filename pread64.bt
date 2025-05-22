@@ -1,0 +1,24 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_pread64 /comm == "nginx"/
+{
+	@fd[tid] = args->fd;
+    @start[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_pread64
+/@fd[tid]/
+{
+    $ret = args->ret;
+	$bytes = $ret >= 0 ? $ret : -1;
+    $usecs = (nsecs - @start[tid]) / 1000;
+    $fd = @fd[tid];
+
+    if ( $usecs > 1000000 ) {
+	printf("%d usec %s:%d fd:%d bytes:%d %s\n",
+    $usecs, comm, pid, $fd, $bytes, strftime("%H:%M:%S:%f",nsecs));
+    }
+	delete(@fd[tid]);
+    delete(@start[tid]);
+
+}

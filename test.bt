@@ -1,0 +1,9 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_openat /comm == "nginx"/
+{
+
+    printf("%d %s %s\n ", args->flags, comm, str(args->filename));
+
+
+}

@@ -1,0 +1,18 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_gettimeofday
+{
+    @start[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_gettimeofday
+/@start[tid]/
+{
+    $usecs = (nsecs - @start[tid]) / 1000;
+
+	printf("%d usec %d \n",
+    $usecs, pid);
+    delete(@start[tid]);
+
+}
+

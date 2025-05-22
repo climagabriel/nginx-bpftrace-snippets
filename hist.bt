@@ -1,0 +1,20 @@
+#!/usr/bin/bpftrace
+
+tracepoint:syscalls:sys_enter_write* /comm == "nginx"/
+{
+	@start[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_writev
+/@start[pid]/
+{
+	@writev = hist((nsecs - @start[tid]) / 1000);
+	delete(@start[tid]);
+}
+
+tracepoint:syscalls:sys_exit_write
+/@start[pid]/
+{
+	@write = hist((nsecs - @start[tid]) / 1000);
+	delete(@start[tid]);
+}

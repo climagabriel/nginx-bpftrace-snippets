@@ -1,0 +1,7 @@
+#!/usr/bin/env bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_rwlock_wlock
+uprobe:/usr/sbin/nginx:ngx_rwlock_unlock
+{
+	printf("%s %d %s %d\n", strftime("%H:%M:%S:%f",nsecs), pid, probe, arg1); }
+}

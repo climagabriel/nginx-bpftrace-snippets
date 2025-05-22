@@ -1,0 +1,28 @@
+#!/usr/bin/bpftrace
+ 
+#include <net/sock.h>
+kprobe:tcp_sendmsg,kprobe:tcp_recvmsg  /comm == "nginx" || comm == "curl"/
+{
+    @sk[tid] = arg0;
+    @size[tid] = arg2;
+}
+kprobe:tcp_sendmsg,kprobe:tcp_recvmsg /@sk[tid]/
+{   
+    $sk = (struct sock *)@sk[tid];
+    $size = @size[tid];
+
+    if ($sk->__sk_common.skc_daddr == 0x300007f || $sk->__sk_common.skc_rcv_saddr == 0x300007f  ) {
+    $af = $sk->__sk_common.skc_family;
+    $daddr = ntop($af, $sk->__sk_common.skc_daddr);
+    $saddr = ntop($af, $sk->__sk_common.skc_rcv_saddr);
+    $lport = $sk->__sk_common.skc_num;
+    $dport = $sk->__sk_common.skc_dport; 
+    cat("/proc/%d/cmdline", pid);
+    $dport = ($dport >> 8) | (($dport << 8) & 0xff00);
+        printf("\n %s %s %s:%d  %s:%d %d bytes\n\n",
+                strftime("%H:%M:%S", nsecs),probe, $saddr, $lport, $daddr, $dport, $size);
+    }
+
+    delete(@sk[tid]);     
+    delete(@size[tid]);  
+}

@@ -1,0 +1,11 @@
+#!/usr/bin/env bpftrace
+
+'tracepoint:syscalls:sys_enter_openat /comm == "nginx"/ { if ( pid != tid ) { printf("%d %d %s %s\n", pid, tid, probe, str(args->filename)); } }'
+
+
+'tracepoint:syscalls:sys_enter_openat /comm == "nginx"/ { @retval = hist( pid != tid ? 0 : 1); }'
+
+'tracepoint:syscalls:sys_enter_openat /pid == 167530/ { @retval = hist( pid != tid ? 0 : 1); }'
+
+'tracepoint:syscalls:sys_enter_openat /comm == "nginx"/ { if ( pid != tid ) { @[probe] = count(); } }'
+

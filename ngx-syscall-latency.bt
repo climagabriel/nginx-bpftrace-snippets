@@ -1,0 +1,118 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_epoll_create,
+tracepoint:syscalls:sys_enter_epoll_create1,
+tracepoint:syscalls:sys_enter_epoll_ctl,
+tracepoint:syscalls:sys_enter_epoll_pwait,
+tracepoint:syscalls:sys_enter_epoll_pwait2,
+tracepoint:syscalls:sys_enter_epoll_wait,
+tracepoint:syscalls:sys_enter_getrandom,
+tracepoint:syscalls:sys_enter_brk,
+tracepoint:syscalls:sys_enter_sched_yield,
+tracepoint:syscalls:sys_enter_futex,
+tracepoint:syscalls:sys_enter_munmap,
+tracepoint:syscalls:sys_enter_gettid,
+tracepoint:syscalls:sys_enter_mkdir,
+tracepoint:syscalls:sys_enter_mmap,
+tracepoint:syscalls:sys_enter_rt_sigprocmask,
+tracepoint:syscalls:sys_enter_shutdown,
+tracepoint:syscalls:sys_enter_connect,
+tracepoint:syscalls:sys_enter_socket,
+tracepoint:syscalls:sys_enter_mprotect,
+tracepoint:syscalls:sys_enter_chmod,
+tracepoint:syscalls:sys_enter_accept4,
+tracepoint:syscalls:sys_enter_rename,
+tracepoint:syscalls:sys_enter_unlink,
+tracepoint:syscalls:sys_enter_statfs,
+tracepoint:syscalls:sys_enter_recvmsg,
+tracepoint:syscalls:sys_enter_getsockname,
+tracepoint:syscalls:sys_enter_pwritev,
+tracepoint:syscalls:sys_enter_sendmsg,
+tracepoint:syscalls:sys_enter_newfstatat,
+tracepoint:syscalls:sys_enter_openat,
+tracepoint:syscalls:sys_enter_close,
+tracepoint:syscalls:sys_enter_pwrite64,
+tracepoint:syscalls:sys_enter_setsockopt,
+tracepoint:syscalls:sys_enter_pread64,
+tracepoint:syscalls:sys_enter_ioctl,
+tracepoint:syscalls:sys_enter_recvfrom,
+tracepoint:syscalls:sys_enter_getpid,
+tracepoint:syscalls:sys_enter_sendfile64,
+tracepoint:syscalls:sys_enter_writev,
+tracepoint:syscalls:sys_enter_sendto,
+tracepoint:syscalls:sys_enter_rt_sigreturn,
+tracepoint:syscalls:sys_enter_read,
+tracepoint:syscalls:sys_enter_getsockopt,
+tracepoint:syscalls:sys_enter_readv,
+tracepoint:syscalls:sys_enter_madvise,
+tracepoint:syscalls:sys_enter_write /comm == "nginx"/
+{
+	@probename[tid] = probe;
+    @start[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_epoll_create,
+tracepoint:syscalls:sys_exit_epoll_create1,
+tracepoint:syscalls:sys_exit_epoll_ctl,
+tracepoint:syscalls:sys_exit_epoll_pwait,
+tracepoint:syscalls:sys_exit_epoll_pwait2,
+tracepoint:syscalls:sys_exit_epoll_wait,
+tracepoint:syscalls:sys_exit_getrandom,
+tracepoint:syscalls:sys_exit_brk,
+tracepoint:syscalls:sys_exit_sched_yield,
+tracepoint:syscalls:sys_exit_futex,
+tracepoint:syscalls:sys_exit_munmap,
+tracepoint:syscalls:sys_exit_gettid,
+tracepoint:syscalls:sys_exit_mkdir,
+tracepoint:syscalls:sys_exit_mmap,
+tracepoint:syscalls:sys_exit_rt_sigprocmask,
+tracepoint:syscalls:sys_exit_shutdown,
+tracepoint:syscalls:sys_exit_connect,
+tracepoint:syscalls:sys_exit_socket,
+tracepoint:syscalls:sys_exit_mprotect,
+tracepoint:syscalls:sys_exit_chmod,
+tracepoint:syscalls:sys_exit_accept4,
+tracepoint:syscalls:sys_exit_rename,
+tracepoint:syscalls:sys_exit_unlink,
+tracepoint:syscalls:sys_exit_statfs,
+tracepoint:syscalls:sys_exit_recvmsg,
+tracepoint:syscalls:sys_exit_getsockname,
+tracepoint:syscalls:sys_exit_pwritev,
+tracepoint:syscalls:sys_exit_sendmsg,
+tracepoint:syscalls:sys_exit_newfstatat,
+tracepoint:syscalls:sys_exit_openat,
+tracepoint:syscalls:sys_exit_close,
+tracepoint:syscalls:sys_exit_pwrite64,
+tracepoint:syscalls:sys_exit_setsockopt,
+tracepoint:syscalls:sys_exit_pread64,
+tracepoint:syscalls:sys_exit_ioctl,
+tracepoint:syscalls:sys_exit_recvfrom,
+tracepoint:syscalls:sys_exit_getpid,
+tracepoint:syscalls:sys_exit_sendfile64,
+tracepoint:syscalls:sys_exit_writev,
+tracepoint:syscalls:sys_exit_sendto,
+tracepoint:syscalls:sys_exit_rt_sigreturn,
+tracepoint:syscalls:sys_exit_read,
+tracepoint:syscalls:sys_exit_getsockopt,
+tracepoint:syscalls:sys_exit_readv,
+tracepoint:syscalls:sys_exit_madvise,
+tracepoint:syscalls:sys_exit_write /@start[tid]/
+{
+    $usecs = (nsecs - @start[tid]) / 1000;
+
+    if ($usecs > $1) {
+        printf("%d usec %s:%d %s %s \n",
+             $usecs, comm, pid, @probename[tid], strftime("%H:%M:%S:%f",nsecs));
+    }
+	delete(@probename[tid]);
+    delete(@start[tid]);
+}
+
+//bpftrace -l 'tracepoint:syscalls:sys_enter_epoll*'
+//tracepoint:syscalls:sys_enter_epoll_create
+//tracepoint:syscalls:sys_enter_epoll_create1
+//tracepoint:syscalls:sys_enter_epoll_ctl
+//tracepoint:syscalls:sys_enter_epoll_pwait
+//tracepoint:syscalls:sys_enter_epoll_pwait2
+//tracepoint:syscalls:sys_enter_epoll_wait
+

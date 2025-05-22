@@ -1,0 +1,23 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_newfstatat
+{
+	@filename[tid] = args->filename;
+    @start[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_newfstatat
+/@filename[tid]/
+{
+	$ret = args->ret;
+	$fd = $ret >= 0 ? $ret : -1;
+	$errno = $ret >= 0 ? 0 : - $ret;
+    $usecs = (nsecs - @start[tid]) / 1000;
+
+    if ( $usecs > 1 ) {
+	printf("%d usec %s:%d fd:%d err:%d %s %s\n",
+    $usecs, comm, pid, $fd, $errno, str(@filename[tid]), strftime("%H:%M:%S:%f",nsecs));
+    }
+	delete(@filename[tid]);
+    delete(@start[tid]);
+}

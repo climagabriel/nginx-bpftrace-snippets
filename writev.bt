@@ -1,0 +1,24 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_enter_write,
+tracepoint:syscalls:sys_enter_writev /comm == "nginx"/
+{
+	@fd[tid] = args->fd;
+    @start[tid] = nsecs;
+}
+
+tracepoint:syscalls:sys_exit_write,
+tracepoint:syscalls:sys_exit_writev
+/@fd[tid]/
+{
+	$ret = args->ret;
+	$errno = $ret >= 0 ? 0 : - $ret;
+    $usecs = (nsecs - @start[tid]) / 1000;
+
+    if ( $usecs > $1 ) {
+	printf("%s %d usec %d:%d fd:%d err:%d %s\n",
+    probe, $usecs, tid, pid, @fd[tid], $errno, strftime("%H:%M:%S:%f",nsecs));
+    }
+	delete(@fd[tid]);
+    delete(@start[tid]);
+}

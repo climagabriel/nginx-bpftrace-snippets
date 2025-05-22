@@ -1,0 +1,6 @@
+#!/usr/bin/bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_http_lua_ffi_shdict_get /comm == "nginx"/
+{
+    printf("%s %d Content: %s\n", strftime("%H:%M:%S", nsecs), pid, str(*arg4));
+}

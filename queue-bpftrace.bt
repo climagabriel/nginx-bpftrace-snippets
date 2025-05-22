@@ -1,0 +1,47 @@
+#!/usr/bin/env bpftrace
+
+//static int __must_check tcp_queue_rcv(struct sock *sk, struct sk_buff *skb, bool *fragstolen)
+//int                     tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int flags, int *addr_len)
+//void                    tcp_close(struct sock *sk, long timeout)
+
+
+kprobe:tcp_queue_rcv,kprobe:tcp_data_queue
+{
+}
+
+kprobe:tcp_recvmsg,kprobe:tcp_recv_skb
+{
+    $sk = (struct sock *)arg0;
+    $skb = (struct sk_buff *)$sk->sk_receive_queue.next;
+    if ($sk->sk_receive_queue.next != $sk->sk_receive_queue.prev) {
+        $tcphdr = (struct tcphdr *)__builtin_preserve_access_index($skb->head + $skb->transport_header);
+        $dport = (($tcphdr->dest >> 8) | (($tcphdr->dest & 0xff) << 8));
+
+        if ($dport == $1) {
+            $sport = (($tcphdr->source >> 8) | (($tcphdr->source & 0xff) << 8));
+            $begin = @start_times[tid, $sport];
+            if ($begin > 0) {
+                @latency_stats = hist((nsecs - $begin) / 1000);
+                @found = 1;
+                delete(@start_times[tid, $sport]);
+            }
+        }
+    }
+}
+
+kprobe:tcp_close,kprobe:tcp_disconnect
+{
+    $sk = (struct sock *)arg0;
+    $skb = (struct sk_buff *)$sk->sk_receive_queue.next;
+    if ($sk->sk_receive_queue.next != $sk->sk_receive_queue.prev) {
+        $tcphdr = (struct tcphdr *)__builtin_preserve_access_index($skb->head + $skb->transport_header);
+        $dport = (($tcphdr->dest >> 8) | (($tcphdr->dest & 0xff) << 8));
+
+        if ($dport == $1) {
+            $sport = (($tcphdr->source >> 8) | (($tcphdr->source & 0xff) << 8));
+            delete(@start_times[tid, $sport]);
+        }
+    }
+}
+
+}
