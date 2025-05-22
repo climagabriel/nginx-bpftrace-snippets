@@ -1,0 +1,145 @@
+If you ever need to check nginx struct member values at runtime you can do that with bpftrace. 
+arg0, arg1 etc would be the arguments of the function you want to access.
+
+example that attaches to ngx_http_finalize_request and prints r->connection.addr_text.data
+
+ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
+Here ^ is the function prototype , r is the arg0
+
+#!/usr/bin/bpftrace --unsafe
+
+//uprobe:/usr/sbin/nginx:ngx_http_send_header
+//uprobe:/usr/sbin/nginx:ngx_http_finalize_request
+//uprobe:/usr/sbin/nginx:ngx_http_free_request
+//uprobe:/usr/sbin/nginx:ngx_http_send_special_response.isra.0
+//uprobe:/usr/sbin/nginx:ngx_http_send_header
+//uprobe:/usr/sbin/nginx:ngx_http_send_special
+//uprobe:/usr/sbin/nginx:ngx_http_v2_connection_error
+uprobe:/usr/sbin/nginx:ngx_http_log_status
+{
+    $req_pointer = (uint64)arg0;
+
+    $req_len_p = 1296 + $req_pointer;
+    $req_len = *$req_len_p;
+
+    $conn_pp = $req_pointer + 8;
+    $conn_p = (uint64)*(uint64*)$conn_pp;
+    $num_p = $conn_p + 208;
+    $num = *$num_p;
+
+    //$sock_pp = $conn_p + 104;
+    //$sock_p = (uint64)*(uint64*)$sock_pp;
+
+    //$addr_in = (struct sockaddr_in *)args->uservaddr;
+	//$addr = ntop($addr_in->sin_addr.s_addr);
+	//printf("%s connects to %s\n", comm, $addr);
+
+    $addr_len_p = $conn_p + 120;
+    $addr_len = *$addr_len_p;
+
+    $addr_pp = $conn_p + 128;
+    $addr_p = (uint64)*(uint64*)$addr_pp;
+
+    $len_p = $req_pointer + 424;
+    $len = *$len_p;
+
+    $serv_pp = $req_pointer + 432;
+    $serv_p = (uint64)*(uint64*)$serv_pp;
+
+    $status_p = $req_pointer + 576;
+    $status = *$status_p;
+
+
+    //if ($req_len > 10000) {
+    if ($status == 0) {
+        printf("reql: %d conn: %d addr: %s %d %s %s\n",
+               $req_len, $num, str($addr_p, $addr_len), $status, strftime("%H:%M:%S", nsecs), str($serv_p, $len));
+    //signal(11);
+    //exit();
+    }
+}
+
+To get the offset of the field:
+(convert the hex to decimal; echo$((0xFF)) works for example)
+    gdb
+    file /usr/sbin/nginx
+    print &((ngx_http_request_t *)0)->connection
+
+Note: If you are working with a C binary you can treat the a member of a nested structure as belonging to the original structure, i.e. the offset is calculated relative to the original struct.  
+
+Another example: print the status
+print ((ngx_http_request_t *)0).headers_out.status
+#!/usr/bin/bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_http_finalize_request
+{
+    $req_pointer = (uint64)arg0;
+    $status_p = $req_pointer + 576;
+    $status = *$status_p;
+    printf("%d\n", $status);
+}
+
+Server name
+#!/usr/bin/bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_http_finalize_request
+{
+    $req_pointer = (uint64)arg0;
+
+    $len_p = $req_pointer + 424;
+    $len = *$len_p;
+
+    $serv_pp = $req_pointer + 432;
+    $serv_p = (uint64)*(uint64*)$serv_pp;
+
+    printf("%s\n", str($serv_p, $len));
+}
+
+
+
+Notably, you can reuse  the same code for different functions as long as those functions take the same struct pointers in the same positions.
+
+
+
+    if ($status == 000) {
+        signal(11);
+        exit();
+    }
+
+must be called as req_time.bt $(date +%s)
+because bpftrace doesn't have an epoch builtin
+
+#!/usr/bin/bpftrace --unsafe
+
+uprobe:/usr/sbin/nginx:ngx_http_log_request_time
+{
+    $req_pointer = (uint64)arg0;
+
+    $start_time_p = $req_pointer + 832;
+    $start_time = *$start_time_p;
+
+    $init = $1;
+    $sec = $init + (elapsed / 1000000000);
+    if ($sec > $start_time) {
+        $req_time = $sec - $start_time;
+        if ($req_time >= 4) {
+         $len_p = $req_pointer + 424;
+         $len = *$len_p;
+
+         $serv_pp = $req_pointer + 432;
+         $serv_p = (uint64)*(uint64*)$serv_pp;
+         $name = str($serv_p, $len);
+
+
+            if ($name == "test.com") {
+                    $conn_pp = $req_pointer + 8;
+                    $conn_p = (uint64)*(uint64*)$conn_pp;
+                    $num_p = $conn_p + 208;
+                    $num = *$num_p;
+                 printf("%s %d %d %d \n", $name, $req_time, $num, $start_time);
+                 signal(11);
+                exit();
+            }
+        }
+    }
+}
