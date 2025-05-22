@@ -105,3 +105,47 @@ tracepoint:syscalls:sys_exit_write /@start[tid]/
 	delete(@probename[tid]);
     delete(@start[tid]);
 }
+
+
+/*
+@[tracepoint:syscalls:sys_exit_getrandom]: 3
+@[tracepoint:syscalls:sys_exit_rt_sigprocmask]: 5
+@[tracepoint:syscalls:sys_exit_brk]: 33
+@[tracepoint:syscalls:sys_exit_mkdir]: 5704
+@[tracepoint:syscalls:sys_exit_mmap]: 5807
+@[tracepoint:syscalls:sys_exit_getpid]: 12740
+@[tracepoint:syscalls:sys_exit_close]: 25771
+@[tracepoint:syscalls:sys_exit_shutdown]: 26467
+@[tracepoint:syscalls:sys_exit_getsockname]: 40195
+@[tracepoint:syscalls:sys_exit_chmod]: 59510
+@[tracepoint:syscalls:sys_exit_ioctl]: 61636
+@[tracepoint:syscalls:sys_exit_mprotect]: 65514
+@[tracepoint:syscalls:sys_exit_recvmsg]: 71145
+@[tracepoint:syscalls:sys_exit_gettid]: 75767
+@[tracepoint:syscalls:sys_exit_socket]: 81658
+@[tracepoint:syscalls:sys_exit_epoll_ctl]: 101889
+@[tracepoint:syscalls:sys_exit_accept4]: 137868
+@[tracepoint:syscalls:sys_exit_futex]: 150177
+@[tracepoint:syscalls:sys_exit_newfstatat]: 153051
+@[tracepoint:syscalls:sys_exit_statfs]: 169023
+@[tracepoint:syscalls:sys_exit_connect]: 214234
+@[tracepoint:syscalls:sys_exit_rename]: 245890
+@[tracepoint:syscalls:sys_exit_getsockopt]: 346034
+@[tracepoint:syscalls:sys_exit_setsockopt]: 604129
+@[tracepoint:syscalls:sys_exit_unlink]: 636716
+@[tracepoint:syscalls:sys_exit_munmap]: 730720
+@[tracepoint:syscalls:sys_exit_sendmsg]: 787374
+@[tracepoint:syscalls:sys_exit_madvise]: 1026649
+@[tracepoint:syscalls:sys_exit_read]: 1447030
+@[tracepoint:syscalls:sys_exit_pwritev]: 1628083
+@[tracepoint:syscalls:sys_exit_pwrite64]: 1802492
+@[tracepoint:syscalls:sys_exit_recvfrom]: 2470509
+@[tracepoint:syscalls:sys_exit_openat]: 3038202
+@[tracepoint:syscalls:sys_exit_sendto]: 4104999
+@[tracepoint:syscalls:sys_exit_writev]: 4818561
+@[tracepoint:syscalls:sys_exit_pread64]: 5455367
+@[tracepoint:syscalls:sys_exit_write]: 7513232
+@[tracepoint:syscalls:sys_exit_readv]: 15991730
+@[tracepoint:syscalls:sys_exit_sendfile64]: 17261239
+@[tracepoint:syscalls:sys_exit_epoll_wait]: 6079916328
+*/
