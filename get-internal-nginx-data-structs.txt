@@ -145,3 +145,13 @@ uprobe:/usr/sbin/nginx:ngx_http_log_request_time
     }
 
 }
+
+
+
+You may need to do bit magic for fields with bit size :3 specified.
+
+                $upstream_pp = $req_pointer + 72;
+                $upstream_p = (uint64)*(uint64*)$upstream_pp;
+                $status_p = $upstream_p + 1120;
+                $status = *$status_p;
+                $status_r = $status & 0x07;
