@@ -118,10 +118,11 @@ uprobe:/usr/sbin/nginx:ngx_http_log_request_time
     $start_time_p = $req_pointer + 832;
     $start_time = *$start_time_p;
 
-    $init = $1;
-    $sec = $init + (elapsed / 1000000000);
-    if ($sec > $start_time) {
-        $req_time = $sec - $start_time;
+    $epoch = nsecs(tai) / 1000000000;
+
+    if ($epoch > $start_time) {
+
+        $req_time = $epoch - $start_time;
         if ($req_time >= 4) {
          $len_p = $req_pointer + 424;
          $len = *$len_p;
@@ -142,4 +143,5 @@ uprobe:/usr/sbin/nginx:ngx_http_log_request_time
             }
         }
     }
+
 }
