@@ -1,0 +1,63 @@
+bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_free { printf("%d\n", pid) }'
+bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc { printf("%d\n", pid); @count = count(); }'
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_lock_wait { printf("%d\n", pid); }'
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream_connect { printf("%d\n", pid); }'
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream_connect { printf("%d\n", pid); }'
+
+bpftrace -e 'kfunc:tcp_* /comm == "nginx"/ { printf("%d %s %s\n", pid, comm, probe); }'
+timeout 10 bpftrace -e 'kfunc:tcp_* /comm == "nginx"/ { @[probe] = count(); }'
+
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream* { printf("%d %s\n", pid, probe); }'
+bpftrace -e 'kfunc:tcp_* /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+timeout 10 bpftrace -e 'kfunc:native_queued_spin_lock_slowpath{ @[comm] = count();}'
+timeout 10 bpftrace -e 'kfunc:native_queued_spin_lock_slowpath{printf("%s\n",curtask→comm);}'
+timeout 10 bpftrace -e 'kfunc:_raw_spin_lock{ @[comm] = count();}'
+timeout 10 bpftrace -e 'kfunc:_raw_spin_lock { @[pid] = count(); }'
+bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+bpftrace -e ‘kfunc:hrtimer_wakeup { printf(“%s:%d\n”,curtask->comm,curtask->pid); }’
+
+
+
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream* { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream_connect { printf("%s\n", ustack()); }'
+bpftrace -e 'kprobe:tcp_* /comm == "nc"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+
+timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_shmtx_lock { @[ustack(1)] = count();}''
+timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_get_variable { @[pid] = count();}'
+timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_openat { @[comm] = count(); }'
+
+timeout 60 bpftrace -e 'has_bh_in_lru'
+timeout 10 bpftrace -e 'kretprobe:tcp_sendmsg_locked /comm == "nginx"/ { @bytes = hist(retval); }'
+
+timeout 10 bpftrace -e 'kprobe:tcp_sendmsg_locked /comm == "nginx"/  { @pids = hist(pid); }'
+
+bpftrace -e 'kr:tcp_sendmsg /comm == "nginx"/ { @retval = hist(retval > 0 ? 0 : - retval); }'
+
+bpftrace -e 'tracepoint:syscalls:sys_enter* /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+bpftrace -e 'kprobe:find_inode_fast { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+
+strftime("%H:%M:%S", nsecs)
+
+
+bpftrace -e 'tracepoint:syscalls:sys_enter_rename {printf("%s %s\n", comm, probe);}'
+
+bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:__libc_open64 /comm == "nginx"/ {printf("%s\n", ustack());}'
+bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:open64 /comm == "nginx"/ {printf("%s\n", ustack());}'
+
+timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_pread64 /comm == "nginx"/ { @bytes = hist(args->count);}'
+timeout 60 bpftrace -e 'tracepoint:syscalls:sys_exit_epoll_wait /comm == "nginx"/ { @eventq[args->ret] = count(); }'
+timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter*write* /comm == "nginx"/ { @[probe] = count(); }'
+
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_open_cached_file { printf("%d %d\n", pid, tid); }'
+
+bpftrace -e 'tracepoint:syscalls:sys_enter_mkdir /comm == "nginx"/ {printf("%s\n", str(args->pathname));}'
+
+bpftrace -e 'kfunc:try_to_free_pages {printf("%s\n", comm);}'
+
+timeout 60 bpftrace -e 'kprobe:shrink_*active_list { @[probe] = count(); }'
+
+bpftrace -e 'kprobe:native_queued_spin_lock_slowpath { @[kstack()] = count();}' -o traces
+
+
+
+bpftrace --unsafe -e 'tracepoint:syscalls:sys_enter_write /comm == "nginx"/ { system("ls -l /proc/%d/fd/%d", pid, args->fd);}'
