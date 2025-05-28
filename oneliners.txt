@@ -58,6 +58,7 @@ timeout 60 bpftrace -e 'kprobe:shrink_*active_list { @[probe] = count(); }'
 
 bpftrace -e 'kprobe:native_queued_spin_lock_slowpath { @[kstack()] = count();}' -o traces
 
-
-
 bpftrace --unsafe -e 'tracepoint:syscalls:sys_enter_write /comm == "nginx"/ { system("ls -l /proc/%d/fd/%d", pid, args->fd);}'
+
+#latency histogram of ssl_client_hello_by_lua
+timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_handler { @start[tid] = nsecs; } uretprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_handler /@start[tid]/ { @hgram = hist ((nsecs - @start[tid]) / 1000); @count = count(); delete(@start[tid]); }'
