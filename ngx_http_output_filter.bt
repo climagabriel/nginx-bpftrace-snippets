@@ -19,6 +19,11 @@ uretprobe:/usr/sbin/nginx:ngx_http_output_filter /@start[tid]/
 {
     @[retval] = count();
 
-    @histobram = hist((nsecs - @start[tid]) / 1000);
+   if (retval == -2) {
+       @again_hist = hist((nsecs - @start[tid]) / 1000);
+    } else {
+       @hist = hist((nsecs - @start[tid]) / 1000);
+    }
+
     delete(@start[tid]);
 }
