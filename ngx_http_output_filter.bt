@@ -1,0 +1,24 @@
+#!/usr/bin/bpftrace --unsafe
+
+uprobe:/usr/sbin/nginx:ngx_http_output_filter
+{
+    $req_pointer = (uint64)arg0;
+
+    $serv_pp = $req_pointer + 432;
+    $serv_p = (uint64)*(uint64*)$serv_pp;
+    $len_p = $req_pointer + 424;
+    $len = *$len_p;
+    $name = str($serv_p, $len);
+    if ($name == "test.com") {
+        @start[tid] = nsecs;
+    }
+}
+
+
+uretprobe:/usr/sbin/nginx:ngx_http_output_filter /@start[tid]/
+{
+    @[retval] = count();
+
+    @histobram = hist((nsecs - @start[tid]) / 1000);
+    delete(@start[tid]);
+}
