@@ -62,3 +62,5 @@ bpftrace --unsafe -e 'tracepoint:syscalls:sys_enter_write /comm == "nginx"/ { sy
 
 #latency histogram of ssl_client_hello_by_lua
 timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_handler { @start[tid] = nsecs; } uretprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_handler /@start[tid]/ { @hgram = hist ((nsecs - @start[tid]) / 1000); @count = count(); delete(@start[tid]); }'
+
+timeout 60 bpftrace -e 'uprobe:/opt/gcore/openresty12532-ssl340-gcdn/openssl34/lib/libssl.so.3:SSL_write { @ = hist(arg2);}'
