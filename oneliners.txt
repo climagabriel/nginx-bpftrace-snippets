@@ -66,3 +66,5 @@ timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_han
 timeout 60 bpftrace -e 'uprobe:/opt/gcore/openresty12532-ssl340-gcdn/openssl34/lib/libssl.so.3:SSL_write { @ = hist(arg2);}'
 
 timeout 60 bpftrace -e 'uretprobe:/usr/sbin/nginx:ngx_http_output_filter { @[retval] = count();}'
+
+timeout 60 bpftrace -e  'uretprobe:/opt/gcore/openresty12532-ssl340-gcdn/openssl34/lib/libssl.so.3:SSL_get_error {@[retval] = count();}'
