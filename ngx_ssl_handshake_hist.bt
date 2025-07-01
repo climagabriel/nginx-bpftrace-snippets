@@ -1,0 +1,16 @@
+#!/usr/bin/env bpftrace
+
+uprobe:/usr/sbin/nginx:ngx_ssl_handshake
+{
+    @start[tid] = nsecs;
+}
+
+
+uretprobe:/usr/sbin/nginx:ngx_ssl_handshake /@start[tid]/
+{
+    @ = hist(
+    (nsecs - @start[tid]) / 1000
+    );
+
+    delete(@start[tid]);
+}
