@@ -72,3 +72,10 @@ timeout 60 bpftrace -e  'uretprobe:/opt/gcore/openresty12532-ssl340-gcdn/openssl
 timeout 60 bpftrace -e 'tracepoint:raw_syscalls:sys_enter /comm == "nginx"/ { @[args->id] = count(); }'
 
 timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_connect /comm == "nginx"/ { if (args->uservaddr->sa_family == 2) { $s = (struct sockaddr_in *)args->uservaddr; $addr = ntop(2, $s->sin_addr.s_addr); @[$addr] = count(); } }'
+
+
+timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_handler { @start[tid] = nsecs; } uretprobe:/usr/sbin/nginx:ngx_http_lua_ssl_client_hello_handler /@start[tid]/ { @hgram = hist ((nsecs - @start[tid]) / 1000); @count = count(); delete(@start[tid]); }'
+
+
+timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_ssl_handshake { @start[tid] = nsecs; } uprobe:/usr/sbin/nginx:ngx_ssl_handshake /@start[tid]/ { @hgram = hist ((nsecs - @start[tid]) / 1000); @count = count(); delete(@start[tid]); }'
+
