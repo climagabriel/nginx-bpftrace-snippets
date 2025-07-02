@@ -1,0 +1,16 @@
+uprobe:/usr/sbin/nginx:ngx_http_variable_remote_addr
+{
+    $req_p = (uint64)arg0;
+
+    $conn_pp = $req_p + 8;
+    $conn_p = (uint64)*(uint64*)$conn_pp;
+
+    $addr_pp = $conn_p + 120;
+    $addr_len = *$addr_pp;
+
+    $addr_str_p = $conn_p + 128;
+    $addr_str = (uint64)*(uint64*)$addr_str_p;
+
+    printf("%s\n", str($addr_str ,$addr_len));
+
+}
