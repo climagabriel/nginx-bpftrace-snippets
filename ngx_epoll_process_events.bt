@@ -1,0 +1,38 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:syscalls:sys_exit_epoll_wait /comm == "nginx"/
+{
+    if (args->ret == -4) {
+        @interrupted = count();
+    }
+
+    if (args->ret < 0) {
+        @error = count();
+    }
+
+    if (args->ret == 0) {
+        @zero_events = count();
+    }
+
+    if (args->ret > 0) {
+        @[args->ret] = count();
+        @start[tid] = nsecs;
+        @eventsnr[tid] = args->ret;
+    }
+}
+
+uretprobe:/usr/sbin/nginx:ngx_epoll_process_events /@start[tid]/
+{
+
+    if (@eventsnr[tid] > 10) {
+    } else {
+        @ev_loop_duration_below_10_events = hist((nsecs - @start[tid]) / 1000);
+    }
+
+    delete(@start[tid]);
+    delete(@eventsnr[tid]);
+
+    if (elapsed / 1000000000 > $1) {
+        exit();
+    }
+}
