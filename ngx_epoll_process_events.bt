@@ -34,7 +34,9 @@ uretprobe:/usr/sbin/nginx:ngx_epoll_process_events /@start[tid]/
     delete(@eventsnr[tid]);
 
     if (elapsed / 1000000000 > $1) {
+        clear(@start);
+        clear(@eventsnr);
+        clear(@);
         exit();
     }
 }
-
