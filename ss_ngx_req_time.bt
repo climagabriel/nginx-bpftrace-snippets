@@ -1,0 +1,52 @@
+#!/usr/bin/bpftrace --unsafe
+
+uprobe:/usr/sbin/nginx:ngx_http_log_handler
+{
+    $req_p = (uint64)arg0;
+
+    $start_time_p = $req_p + 832;
+    $start_time = *$start_time_p;
+
+    $init = $1;
+    $epoch = $init + (elapsed / 1e9);
+
+
+    if ($epoch > $start_time) {
+
+        $req_time = $epoch - $start_time;
+        if ($req_time >= 2) {
+         $len_p = $req_p + 424;
+         $len = *$len_p;
+
+         $serv_pp = $req_p + 432;
+         $serv_p = (uint64)*(uint64*)$serv_pp;
+         $name = str($serv_p, $len);
+
+
+            if ($name == "test.com") {
+                    $conn_pp = $req_p + 8;
+                    $conn_p = (uint64)*(uint64*)$conn_pp;
+                    $num_p = $conn_p + 208;
+                    $num = *$num_p;
+
+                    $addr_pp = $conn_p + 120;
+                    $addr_len = *$addr_pp;
+
+                    $addr_str_p = $conn_p + 128;
+                    $addr_str = (uint64)*(uint64*)$addr_str_p;
+                    $ipaddr = str($addr_str ,$addr_len);
+
+                    $upstream_pp = $req_p + 72;
+                    $upstream_p = (uint64)*(uint64*)$upstream_pp;
+
+                    $status_p = $upstream_p + 1120;
+                    $status = *$status_p;
+                    $status_r = $status & 0x07;
+
+                    system("ss -HOtani 'sport = 443' dst [%s]", $ipaddr);
+                    printf("%s req_time: %d connid: %d start_time: %d cache_status: %u %s\n\n\n", $name, $req_time, $num, $start_time, $status_r, $ipaddr);
+            }
+        }
+        }
+}
+
