@@ -25,6 +25,7 @@ uretprobe:/usr/sbin/nginx:ngx_epoll_process_events /@start[tid]/
 {
 
     if (@eventsnr[tid] > 10) {
+        @ev_loop_duration_over_10_events = hist((nsecs - @start[tid]) / 1000);
     } else {
         @ev_loop_duration_below_10_events = hist((nsecs - @start[tid]) / 1000);
     }
@@ -36,3 +37,4 @@ uretprobe:/usr/sbin/nginx:ngx_epoll_process_events /@start[tid]/
         exit();
     }
 }
+
