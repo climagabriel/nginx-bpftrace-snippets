@@ -82,3 +82,7 @@ timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_ssl_handshake { @start[tid] =
 timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_epoll_process_events { @start[tid] = nsecs; } uretprobe:/usr/sbin/nginx:ngx_epoll_process_events /@start[tid]/ { @epoll_iteration_duration = hist((nsecs - @start[tid]) / 1000); delete(@start[tid]); }'
 
 bpftrace -e 'uretprobe:/root/nginx-gcdn/objs/nginx:ngx_http_upstream_cache {printf("%d\n", retval);}'
+
+timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_io_submit { @[comm] = count(); }'
+
+timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_io_submit { @start[tid] = nsecs; } tracepoint:syscalls:sys_exit_io_submit /@start[tid]/ { @hgram = hist ((nsecs - @start[tid]) / 1000)}'
