@@ -1,0 +1,21 @@
+#!/usr/bin/env bpftrace
+
+kprobe:do_try_to_free_pages
+{
+    @name[tid] = comm;
+    @start[tid] = nsecs;
+}
+
+kretprobe:do_try_to_free_pages
+/@start[tid]/
+{
+    $usecs = (nsecs - @start[tid]) / 1000;
+
+    if ($usecs > $1) {
+        printf("%d usec %s:%d  %s\n",
+                $usecs, comm, pid, strftime("%H:%M:%S:%f",nsecs));
+    }
+    delete(@name[tid]);
+    delete(@start[tid]);
+
+}

@@ -90,3 +90,5 @@ timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_io_submit { @start[tid] = 
 timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_writev /comm=="nginx"/ { @ = hist(args->vlen);}'
 
 bpftrace -e 'tracepoint:syscalls:sys_exit_close /comm == "nginx"/ { if (args->ret != 0) {printf(" %d %d %s %s %s\n ",args->ret , pid , comm, strftime("%H:%M:%S", nsecs), ustack); cat("/proc/%d/cmdline", pid);} }'
+
+bpftrace -e 'uretprobe:/usr/sbin/nginx:ngx_quic_guard_allow_sendmsg {printf("%d\n", retval);}'
