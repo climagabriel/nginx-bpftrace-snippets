@@ -3,36 +3,63 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <libelf.h>
+#include <errno.h>
 
 #define RETPROBE 1
 #define ALL_PIDS -1
+#define OK 0
+#define ERR -1
 
 int main() {
+    const char *path = "/usr/sbin/nginx";
     struct bpf_object *obj;
     struct bpf_program *exit_epoll_wait, *ngx_ev_loop_end;
-    struct bpf_map *start_map, *duration_map;
-    int start_map_fd, duration_map_fd;
-    const char *path = "/usr/sbin/nginx";
-    __u64 ngxoffset = 0x00000000002049e0;
-    struct bpf_link *link;
+    int duration_map_fd;
+    __u64 ngxoffset = 0x00000000002049e0; //TODO DYNAMIC
+    struct bpf_link *uprobe_link, *tracepoint_link;
 
-    obj = bpf_object__open_file("objs/event_loop_histogram.bpf.o", NULL);
-    bpf_object__load(obj);
+    obj = bpf_object__open("objs/event_loop_histogram.bpf.o");
+    if (!obj) {
+        perror("event_loop_histogram.bpf.o open fail");
+        return ERR;
+    }
+
+    int bpf_obj_load_status = bpf_object__load(obj);
+    if (bpf_obj_load_status) {
+        perror("event_loop_histogram.bpf.o open fail");
+        return ERR;
+    }
 
     exit_epoll_wait = bpf_object__find_program_by_name(obj, "exit_epoll_wait");
-    bpf_program__attach(exit_epoll_wait);
+    if (!exit_epoll_wait) {
+        fprintf(stderr, "ngx_ev_loop_end bpf prog not found");
+        return ERR;
+    }
 
-    start_map = bpf_object__find_map_by_name(obj, "start_map");
-    start_map_fd = bpf_map__fd(start_map);
+    tracepoint_link = bpf_program__attach(exit_epoll_wait);
+    if(!tracepoint_link) {
+        perror("tracepoint attach failed");
+        return ERR;
+    }
 
     ngx_ev_loop_end = bpf_object__find_program_by_name(obj, "ngx_ev_loop_end");
-    link = bpf_program__attach_uprobe(ngx_ev_loop_end, RETPROBE, ALL_PIDS, path,
-                                                                     ngxoffset);
+    if (!ngx_ev_loop_end) {
+        fprintf(stderr, "ngx_ev_loop_end bpf prog not found");
+        return ERR;
+    }
 
-    duration_map = bpf_object__find_map_by_name(obj, "duration_map");
-    duration_map_fd = bpf_map__fd(duration_map);
+    uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_end, RETPROBE, ALL_PIDS, 
+        path, ngxoffset);
+    if (!uprobe_link) {
+        perror("uprobe attach failed");
+        return ERR;
+    }
 
-    //struct bpf_link * bpf_program__attach_uprobe(const struct bpf_program *prog, bool retprobe, pid_t pid, const char *binary_path, size_t func_offset);
+    duration_map_fd = bpf_object__find_map_fd_by_name(obj, "duration_map");
+    if (duration_map_fd == ERR) {
+        fprintf(stderr, "find map fd failed");
+        return ERR;
+    }
 
     while (1) {
         __u32 key = 0, next_key;
@@ -46,5 +73,5 @@ int main() {
         sleep(1);
     }
 
-    return 0;
+    return OK;
 }
