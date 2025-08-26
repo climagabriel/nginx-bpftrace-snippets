@@ -1,7 +1,7 @@
 CC = gcc
 CLANG = clang
 CFLAGS = -O2 -Wall
-BPF_CFLAGS = -O2 -target bpf -g
+BPF_CFLAGS = -O2 -target bpf -g -D__TARGET_ARCH_x86 -m64 -Wall
 
 LIBBPF_PATH = /usr/include/bpf
 INCLUDES = -I$(LIBBPF_PATH) -I/usr/include/x86_64-linux-gnu
@@ -11,7 +11,7 @@ BPF_PROG = objs/event_loop_histogram.bpf.o
 LOADER_PROG = event_loop_hist
 #SKEL_HEADER = event_loop_histogram.skel.h
 
-all: $(LOADER_PROG) $(BPF_PROG)
+all:  $(BPF_PROG)  $(LOADER_PROG)
 
 
 $(BPF_PROG): event_loop_histogram.bpf.c
