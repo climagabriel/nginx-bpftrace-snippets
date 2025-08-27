@@ -18,8 +18,8 @@ struct {
 } duration_map SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1024);
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, 24);
     __type(key, __u32);
     __type(value, __u64);
 } buckets_map SEC(".maps");

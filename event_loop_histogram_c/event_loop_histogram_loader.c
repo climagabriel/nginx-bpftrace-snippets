@@ -190,12 +190,14 @@ int print_buckets_mode(struct bpf_object *obj)
         while (bpf_map_get_next_key(buckets_map_fd, &key, &next_key) == 0) {
             bpf_map_lookup_elem(buckets_map_fd, &next_key, &value);
 
-            bucket_min = 1 << (next_key -1);
-            bucket_max = 1 << (next_key);
-            printf("[%u .. %u] %llu\n", bucket_min, bucket_max, value);
+            if (value) {
+                bucket_min = 1 << (next_key -1);
+                bucket_max = 1 << (next_key);
+                printf("[%u .. %u] %llu\n", bucket_min, bucket_max, value);
+            }
             key = next_key;
         }
-        printf("\n"); //TODO aggregate stats 
+        printf("\n");
         sleep(1);
     }
 
