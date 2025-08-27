@@ -12,6 +12,7 @@ static char args_doc[] = "c, v";
 
 static struct argp_option options[] = {
   {"cli",  'c', 0,      0,  "max event loop duration per nginx pid since invocation, one per second" },
+  {"buckets",  'b', 0,      0,  "buckets live one per sec" },
   {"version",  'v', 0,      0,  "version" },
   { 0 }
 };
@@ -20,6 +21,7 @@ struct arguments
 {
   char *args[1];
   int cli;
+  int buckets;
   int ver;
 };
 
@@ -38,6 +40,10 @@ parse_opt (int key, char *arg, struct argp_state *state)
       arguments->ver = 1;
       break;
 
+    case 'b':
+      arguments->buckets = 1;
+      break;
+
     default:
       return ARGP_ERR_UNKNOWN;
     }
@@ -52,11 +58,14 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 #define ERR -1
 
 int cli_invocation_mode(struct bpf_object *obj);
+int print_buckets_mode(struct bpf_object *obj);
+
 
 int main(int argc, char **argv) {
     struct arguments arguments;
     arguments.cli = 0;
     arguments.ver = 0;
+    arguments.buckets = 0;
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
     if (arguments.ver) {
@@ -82,7 +91,7 @@ int main(int argc, char **argv) {
     }
     exit_epoll_wait = bpf_object__find_program_by_name(obj, "exit_epoll_wait");
     if (!exit_epoll_wait) {
-        fprintf(stderr, "ngx_ev_loop_end bpf prog not found");
+        fprintf(stderr, "exit_epoll_wait bpf prog not found");
         return ERR;
     }
 
@@ -96,24 +105,28 @@ int main(int argc, char **argv) {
         cli_invocation_mode(obj);
     }
 
+    if (arguments.buckets) {
+        print_buckets_mode(obj);
+    }
+
     return OK;
 }
 
 int cli_invocation_mode(struct bpf_object *obj)
 {
     const char *path = "/usr/sbin/nginx";
-    struct bpf_program *ngx_ev_loop_end;
+    struct bpf_program *ngx_ev_loop_duration;
     int duration_map_fd;
     __u64 ngxoffset = 0x00000000002049e0; //TODO DYNAMIC
     struct bpf_link *uprobe_link;
 
-    ngx_ev_loop_end = bpf_object__find_program_by_name(obj, "ngx_ev_loop_end");
-    if (!ngx_ev_loop_end) {
-        fprintf(stderr, "ngx_ev_loop_end bpf prog not found");
+    ngx_ev_loop_duration = bpf_object__find_program_by_name(obj, "ngx_ev_loop_duration");
+    if (!ngx_ev_loop_duration) {
+        fprintf(stderr, "ngx_ev_loop_duration bpf prog not found");
         return ERR;
     }
 
-    uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_end, RETPROBE, ALL_PIDS,
+    uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_duration, RETPROBE, ALL_PIDS,
         path, ngxoffset);
     if (!uprobe_link) {
         perror("uprobe attach failed");
@@ -133,6 +146,53 @@ int cli_invocation_mode(struct bpf_object *obj)
         while (bpf_map_get_next_key(duration_map_fd, &key, &next_key) == 0) {
             bpf_map_lookup_elem(duration_map_fd, &next_key, &value);
             printf("PID %u: %llu usec\n", next_key, value);
+            key = next_key;
+        }
+        printf("\n"); //TODO aggregate stats 
+        sleep(1);
+    }
+
+    return OK;
+}
+
+int print_buckets_mode(struct bpf_object *obj)
+{
+    const char *path = "/usr/sbin/nginx";
+    struct bpf_program *ngx_ev_loop_buckets;
+    int buckets_map_fd;
+    __u64 ngxoffset = 0x00000000002049e0; //TODO DYNAMIC
+    struct bpf_link *uprobe_link;
+    __u32 bucket_min, bucket_max;
+
+    ngx_ev_loop_buckets = bpf_object__find_program_by_name(obj, "ngx_ev_loop_buckets");
+    if (!ngx_ev_loop_buckets) {
+        fprintf(stderr, "ngx_ev_loop_buckets bpf prog not found");
+        return ERR;
+    }
+
+    uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_buckets, RETPROBE, ALL_PIDS,
+        path, ngxoffset);
+    if (!uprobe_link) {
+        perror("uprobe attach failed");
+        return ERR;
+    }
+
+    buckets_map_fd = bpf_object__find_map_fd_by_name(obj, "buckets_map");
+    if (buckets_map_fd == ERR) {
+        fprintf(stderr, "find map fd failed");
+        return ERR;
+    }
+
+    while (1) {
+        __u32 key = 0, next_key;
+        __u64 value;
+
+        while (bpf_map_get_next_key(buckets_map_fd, &key, &next_key) == 0) {
+            bpf_map_lookup_elem(buckets_map_fd, &next_key, &value);
+
+            bucket_min = 1 << (next_key -1);
+            bucket_max = 1 << (next_key);
+            printf("[%u .. %u] %llu\n", bucket_min, bucket_max, value);
             key = next_key;
         }
         printf("\n"); //TODO aggregate stats 
