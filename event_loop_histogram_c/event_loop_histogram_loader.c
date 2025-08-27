@@ -2,24 +2,17 @@
 #include <bpf/bpf.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <libelf.h>
 #include <errno.h>
 #include <argp.h>
 
-const char *argp_program_version =
-  "event_loop_histogram 0.01";
-const char *argp_program_bug_address =
-  "<gabriel.clima@gcore.com>";
-
-/* Program documentation. */
-static char doc[] =
-  "Produce Nginx event loop duration histogram";
-
-/* A description of the arguments we accept. */
-static char args_doc[] = "c";
+const char *argp_program_version = "event_loop_histogram 0.01";
+const char *argp_program_bug_address = "<gabriel.clima@gcore.com>";
+static char doc[] =  "Nginx event loop duration histogram / live feed";
+static char args_doc[] = "c, v";
 
 static struct argp_option options[] = {
-  {"verbose",  'c', 0,      0,  "current / cli usage" },
+  {"cli",  'c', 0,      0,  "max event loop duration per nginx pid since invocation, one per second" },
+  {"version",  'v', 0,      0,  "version" },
   { 0 }
 };
 
@@ -27,6 +20,7 @@ struct arguments
 {
   char *args[1];
   int cli;
+  int ver;
 };
 
 static error_t
@@ -38,6 +32,10 @@ parse_opt (int key, char *arg, struct argp_state *state)
     {
     case 'c':
       arguments->cli = 1;
+      break;
+
+    case 'v':
+      arguments->ver = 1;
       break;
 
     default:
@@ -58,7 +56,14 @@ int cli_invocation_mode(struct bpf_object *obj);
 int main(int argc, char **argv) {
     struct arguments arguments;
     arguments.cli = 0;
+    arguments.ver = 0;
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
+    if (arguments.ver) {
+        fprintf(stderr, "%s\n", argp_program_version);
+        fprintf(stderr, "libbpf: %s\n", libbpf_version_string());
+        return OK;
+    }
 
     struct bpf_object *obj;
     struct bpf_program *exit_epoll_wait;
@@ -108,7 +113,7 @@ int cli_invocation_mode(struct bpf_object *obj)
         return ERR;
     }
 
-    uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_end, RETPROBE, ALL_PIDS, 
+    uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_end, RETPROBE, ALL_PIDS,
         path, ngxoffset);
     if (!uprobe_link) {
         perror("uprobe attach failed");
@@ -130,6 +135,7 @@ int cli_invocation_mode(struct bpf_object *obj)
             printf("PID %u: %llu usec\n", next_key, value);
             key = next_key;
         }
+        printf("\n"); //TODO aggregate stats 
         sleep(1);
     }
 

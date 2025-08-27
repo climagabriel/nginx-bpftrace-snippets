@@ -39,24 +39,36 @@ int exit_epoll_wait(void *ctx)
 }
 
 SEC("uretprobe")
-int BPF_UPROBE(ngx_ev_loop_end)
+int BPF_URETPROBE(ngx_ev_loop_end)
 {
     __u32 pid;
-    __u64 start_ts, current_ts, duration_us;
-    void *start_ts_p;
+    __u64 start_ts, current_ts, current_duration, prev_duration;
+    void *start_ts_p, *prev_duration_p;
 
     pid = bpf_get_current_pid_tgid() >> 32;
 
     start_ts_p = bpf_map_lookup_elem(&start_map, &pid);
     if (!start_ts_p)
         return 0;
+
+    bpf_map_delete_elem(&start_map, &pid);
+
     start_ts = *(__u64 *)start_ts_p;
     current_ts = bpf_ktime_get_ns();
 
-    duration_us = (current_ts - start_ts) / 1000;
+    current_duration = (current_ts - start_ts) / 1000;
 
-    bpf_map_update_elem(&duration_map, &pid, &duration_us, BPF_ANY);
-    bpf_map_delete_elem(&start_map, &pid);
+    prev_duration_p = bpf_map_lookup_elem(&duration_map, &pid);
+
+    if (!prev_duration_p) {
+        bpf_map_update_elem(&duration_map, &pid, &current_duration, BPF_ANY);
+    } else {
+        prev_duration = *(__u64 *)prev_duration_p;
+        if (current_duration > prev_duration) {
+            bpf_map_update_elem(&duration_map, &pid, &current_duration, BPF_ANY);
+            return 0;
+        }
+    }
 
     return 0;
 }
