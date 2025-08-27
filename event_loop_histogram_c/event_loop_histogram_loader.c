@@ -4,19 +4,65 @@
 #include <unistd.h>
 #include <libelf.h>
 #include <errno.h>
+#include <argp.h>
+
+const char *argp_program_version =
+  "event_loop_histogram 0.01";
+const char *argp_program_bug_address =
+  "<gabriel.clima@gcore.com>";
+
+/* Program documentation. */
+static char doc[] =
+  "Produce Nginx event loop duration histogram";
+
+/* A description of the arguments we accept. */
+static char args_doc[] = "c";
+
+static struct argp_option options[] = {
+  {"verbose",  'c', 0,      0,  "current / cli usage" },
+  { 0 }
+};
+
+struct arguments
+{
+  char *args[1];
+  int cli;
+};
+
+static error_t
+parse_opt (int key, char *arg, struct argp_state *state)
+{
+  struct arguments *arguments = state->input;
+
+  switch (key)
+    {
+    case 'c':
+      arguments->cli = 1;
+      break;
+
+    default:
+      return ARGP_ERR_UNKNOWN;
+    }
+  return 0;
+}
+
+static struct argp argp = { options, parse_opt, args_doc, doc };
 
 #define RETPROBE 1
 #define ALL_PIDS -1
 #define OK 0
 #define ERR -1
 
-int main() {
-    const char *path = "/usr/sbin/nginx";
+int cli_invocation_mode(struct bpf_object *obj);
+
+int main(int argc, char **argv) {
+    struct arguments arguments;
+    arguments.cli = 0;
+    argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
     struct bpf_object *obj;
-    struct bpf_program *exit_epoll_wait, *ngx_ev_loop_end;
-    int duration_map_fd;
-    __u64 ngxoffset = 0x00000000002049e0; //TODO DYNAMIC
-    struct bpf_link *uprobe_link, *tracepoint_link;
+    struct bpf_program *exit_epoll_wait;
+    struct bpf_link *tracepoint_link;
 
     obj = bpf_object__open("objs/event_loop_histogram.bpf.o");
     if (!obj) {
@@ -29,7 +75,6 @@ int main() {
         perror("event_loop_histogram.bpf.o open fail");
         return ERR;
     }
-
     exit_epoll_wait = bpf_object__find_program_by_name(obj, "exit_epoll_wait");
     if (!exit_epoll_wait) {
         fprintf(stderr, "ngx_ev_loop_end bpf prog not found");
@@ -41,6 +86,21 @@ int main() {
         perror("tracepoint attach failed");
         return ERR;
     }
+
+    if (arguments.cli) {
+        cli_invocation_mode(obj);
+    }
+
+    return OK;
+}
+
+int cli_invocation_mode(struct bpf_object *obj)
+{
+    const char *path = "/usr/sbin/nginx";
+    struct bpf_program *ngx_ev_loop_end;
+    int duration_map_fd;
+    __u64 ngxoffset = 0x00000000002049e0; //TODO DYNAMIC
+    struct bpf_link *uprobe_link;
 
     ngx_ev_loop_end = bpf_object__find_program_by_name(obj, "ngx_ev_loop_end");
     if (!ngx_ev_loop_end) {
