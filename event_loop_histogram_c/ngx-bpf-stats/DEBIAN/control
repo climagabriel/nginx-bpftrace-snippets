@@ -1,0 +1,9 @@
+Package: ngx-bpf-stats
+Version: 0.1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Gabriel Clima <gabriel.clima@gcore.com>
+Description: eBPF exporter of nginx event loop histogram metric
+Depends:
+Homepage: https://github.com/G-Core/nginx-gcdn-ebpf-statistics

@@ -1,27 +1,41 @@
-CC = gcc
-CLANG = clang
-CFLAGS = -O2 -Wall
-BPF_CFLAGS = -O2 -target bpf -g -D__TARGET_ARCH_x86 -m64 -Wall
+PACKAGE_NAME = ngx-bpf-stats
+LOADER_PROGRAM_PATH = $(PACKAGE_NAME)/usr/local/sbin/
+BPF_PROGRAM_PATH = $(PACKAGE_NAME)/var/lib/ngx-bpf-stats/
+NAME = ngx_event_loop_histogram
 
-LIBBPF_PATH = /usr/include/bpf
-INCLUDES = -I$(LIBBPF_PATH) -I/usr/include/x86_64-linux-gnu
-LIBS = -lbpf -lelf -lz
+BPF_PROGRAM = $(BPF_PROGRAM_PATH)/$(NAME).bpf.o
+LOADER_PROGRAM = $(LOADER_PROGRAM_PATH)/$(NAME)
 
-BPF_PROG = objs/event_loop_histogram.bpf.o
-LOADER_PROG = event_loop_hist
-#SKEL_HEADER = event_loop_histogram.skel.h
-
-all:  $(BPF_PROG)  $(LOADER_PROG)
+BUILD_DIR = event_loop_duration_histogram/objs/
+BUILD_BPF_PROGRAM = $(BUILD_DIR)/$(NAME).bpf.o
+BUILD_LOADER_PROGRAM = $(BUILD_DIR)/$(NAME)
 
 
-$(BPF_PROG): event_loop_histogram.bpf.c
-	$(CLANG) $(BPF_CFLAGS) $(INCLUDES) -c event_loop_histogram.bpf.c -o objs/event_loop_histogram.bpf.o
+all: build $(LOADER_PROGRAM_PATH) $(BPF_PROGRAM_PATH) $(BPF_PROGRAM) $(LOADER_PROGRAM)
 
-$(LOADER_PROG): event_loop_histogram_loader.c
-	$(CC) $(CFLAGS) event_loop_histogram_loader.c -o event_loop_hist $(LIBS)
+build: $(BUILD_BPF_PROGRAM) $(BUILD_LOADER_PROGRAM)
+$(BUILD_BPF_PROGRAM) $(BUILD_LOADER_PROGRAM):
+	make -C event_loop_duration_histogram
 
+$(LOADER_PROGRAM_PATH):
+	mkdir -p $(LOADER_PROGRAM_PATH)
+
+$(BPF_PROGRAM_PATH):
+	mkdir -p $(BPF_PROGRAM_PATH)
+
+
+$(BPF_PROGRAM):
+	cp event_loop_duration_histogram/objs/ngx_event_loop_histogram.bpf.o $(BPF_PROGRAM)
+
+$(LOADER_PROGRAM):
+	cp event_loop_duration_histogram/objs/ngx_event_loop_histogram $(LOADER_PROGRAM)
 
 clean:
-	rm -f $(BPF_PROG) $(LOADER_PROG)
+	make clean -C event_loop_duration_histogram
+	rm -f $(BPF_PROGRAM)
+	rm -f $(LOADER_PROGRAM)
+	rm -rf event_loop_duration_histogram/.pytest_cache
+	rm -rf event_loop_duration_histogram/test/__pycache__
+
 
 .PHONY: all clean

@@ -1,0 +1,12 @@
+[Unit]
+Description=Nginx eBPF statistics exporter
+
+[Timer]
+OnBootSec=24
+OnUnitActiveSec=21
+#prometheus-agent scrape frequency is 25 sec
+RandomizedDelaySec=3
+Unit=ngx-bpf-stats.service
+
+[Install]
+WantedBy=timers.target

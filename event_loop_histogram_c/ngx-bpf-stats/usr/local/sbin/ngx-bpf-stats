@@ -1,0 +1,11 @@
+#!/bin/bash
+
+/usr/local/sbin/ngx_event_loop_histogram -q > /srv/prometheus-node-exporter/nginx_event_loop_duration_usec.prom.tmp
+if [[ $(grep -c 'nginx_event_loop_duration_usec_bucket' /srv/prometheus-node-exporter/nginx_event_loop_duration_usec.prom.tmp) != 0 ]]; then
+    mv /srv/prometheus-node-exporter/nginx_event_loop_duration_usec.prom.tmp /srv/prometheus-node-exporter/nginx_event_loop_duration_usec.prom
+    exit 0
+else
+    rm /srv/prometheus-node-exporter/nginx_event_loop_duration_usec.prom.tmp
+    rm /srv/prometheus-node-exporter/nginx_event_loop_duration_usec.prom
+    exit 1
+fi

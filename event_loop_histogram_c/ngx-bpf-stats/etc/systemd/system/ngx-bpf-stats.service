@@ -1,0 +1,6 @@
+[Unit]
+Description=Nginx eBPF statistics exporter
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ngx-bpf-stats

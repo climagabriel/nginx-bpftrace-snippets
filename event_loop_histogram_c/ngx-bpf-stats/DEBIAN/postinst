@@ -1,0 +1,3 @@
+#!/bin/bash
+
+systemd enable ngx-bpf-stats.timer

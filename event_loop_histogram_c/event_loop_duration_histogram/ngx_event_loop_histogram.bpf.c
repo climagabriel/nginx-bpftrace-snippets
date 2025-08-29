@@ -5,7 +5,7 @@
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 10240);
+    __uint(max_entries, 10240); // TODO: is this enough?
     __type(key, __u32);
     __type(value, __u64);
 } start_map SEC(".maps");
@@ -58,7 +58,7 @@ int exit_epoll_wait(void *ctx)
     return 0;
 }
 
-
+/* uretprobe:/usr/sbin/nginx:ngx_epoll_process_events  */
 SEC("uretprobe")
 int BPF_URETPROBE(ngx_ev_loop_duration)
 {
@@ -94,7 +94,7 @@ int BPF_URETPROBE(ngx_ev_loop_duration)
     return 0;
 }
 
-
+/* uretprobe:/usr/sbin/nginx:ngx_epoll_process_events  */
 SEC("uretprobe")
 int BPF_URETPROBE(ngx_ev_loop_buckets)
 {

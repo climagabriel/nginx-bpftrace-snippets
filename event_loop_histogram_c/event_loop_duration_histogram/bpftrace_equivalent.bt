@@ -1,0 +1,13 @@
+tracepoint:syscalls:sys_exit_epoll_wait /comm == "nginx"/
+{
+        //if (args->ret > 0) {
+            @start[pid] = nsecs / 1000;
+        //}
+}
+
+uretprobe:/usr/sbin/nginx:ngx_epoll_process_events /@start[pid]/
+{
+
+    @event_loop_duration = hist((nsecs/1000 - @start[pid]));
+    delete(@start[pid]);
+}
