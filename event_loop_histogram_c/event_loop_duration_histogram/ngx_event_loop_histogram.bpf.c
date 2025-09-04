@@ -99,8 +99,9 @@ SEC("uretprobe")
 int BPF_URETPROBE(ngx_ev_loop_buckets)
 {
     __u32 pid, bucket;
-    __u64 start_ts, current_ts, current_duration, bucket_drops, init = 1;
-    void *start_ts_p, *bucket_p;
+    __u32 *bucket_p;
+    __u64 start_ts, current_ts, current_duration;
+    void *start_ts_p;
 
     pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -117,15 +118,12 @@ int BPF_URETPROBE(ngx_ev_loop_buckets)
     bucket = log2bucket(current_duration);
 
     bucket_p = bpf_map_lookup_elem(&buckets_map, &bucket);
-    if (!bucket_p) {
-            bpf_map_update_elem(&buckets_map, &bucket, &init, BPF_ANY);
-    } else {
-        bucket_drops = *(__u64 *)bucket_p;
-        bucket_drops++;
-        bpf_map_update_elem(&buckets_map, &bucket, &bucket_drops, BPF_ANY);
+    if (bucket_p) { /* BPF_MAP_TYPE_ARRAY ; All array elements are pre-allocated and zero initialized when created */
+        __sync_fetch_and_add(bucket_p, 1);
     }
 
     return 0;
 }
 
 char _license[] SEC("license") = "GPL";
+

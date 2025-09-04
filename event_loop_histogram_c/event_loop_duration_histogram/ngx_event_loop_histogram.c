@@ -36,7 +36,7 @@ struct arguments
   int buckets;
   int ver;
   int quiet;
-  char *object_path;
+  char *object_path; /*TODO you should be able to combine it with other flags*/
 };
 
 static error_t
@@ -144,10 +144,12 @@ int main(int argc, char **argv) {
     }
 
     if (arguments.cli) {
+        fprintf(stderr, "max event loop duration per nginx pid since invocation, per-second refresh\n");
         cli_invocation_mode(obj);
     }
 
     if (arguments.buckets) {
+        fprintf(stderr, "live event loop duration buckets\n");
         print_buckets_mode(obj);
     }
 
@@ -169,6 +171,12 @@ int cli_invocation_mode(struct bpf_object *obj)
         return ERR;
     }
 
+    duration_map_fd = bpf_object__find_map_fd_by_name(obj, "duration_map");
+    if (duration_map_fd == ERR) {
+        fprintf(stderr, "find map fd failed");
+        return ERR;
+    }
+
     uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_duration, RETPROBE, ALL_PIDS,
         path, ngxoffset);
     if (!uprobe_link) {
@@ -176,11 +184,6 @@ int cli_invocation_mode(struct bpf_object *obj)
         return ERR;
     }
 
-    duration_map_fd = bpf_object__find_map_fd_by_name(obj, "duration_map");
-    if (duration_map_fd == ERR) {
-        fprintf(stderr, "find map fd failed");
-        return ERR;
-    }
 
     while (1) {
         __u32 key = 0, next_key;
@@ -191,7 +194,7 @@ int cli_invocation_mode(struct bpf_object *obj)
             printf("PID %u: %llu usec\n", next_key, value);
             key = next_key;
         }
-        printf("\n"); //TODO aggregate stats 
+        printf("\n"); //TODO aggregate stats
         sleep(1);
     }
 
@@ -212,6 +215,12 @@ int print_buckets_mode(struct bpf_object *obj)
         return ERR;
     }
 
+    buckets_map_fd = bpf_object__find_map_fd_by_name(obj, "buckets_map");
+    if (buckets_map_fd == ERR) {
+        fprintf(stderr, "find map fd failed");
+        return ERR;
+    }
+
     uprobe_link = bpf_program__attach_uprobe(ngx_ev_loop_buckets, RETPROBE, ALL_PIDS,
         path, ngxoffset);
     if (!uprobe_link) {
@@ -219,13 +228,8 @@ int print_buckets_mode(struct bpf_object *obj)
         return ERR;
     }
 
-    buckets_map_fd = bpf_object__find_map_fd_by_name(obj, "buckets_map");
-    if (buckets_map_fd == ERR) {
-        fprintf(stderr, "find map fd failed");
-        return ERR;
-    }
 
-    while (1) {
+    while (1) { // TODO: switch to explicit for loop up to max buckets_map
         __u32 key = 0, next_key;
         __u64 value;
 
@@ -251,12 +255,17 @@ int prometheus_histogram_mode(struct bpf_object *obj)
     struct bpf_program *ngx_ev_loop_buckets;
     int buckets_map_fd;
     struct bpf_link *uprobe_link;
-    __u32 bucket_max;
     __u64 ngxoffset = find_function_offset(path, ngx_epoll_process_events);
 
     ngx_ev_loop_buckets = bpf_object__find_program_by_name(obj, "ngx_ev_loop_buckets");
     if (!ngx_ev_loop_buckets) {
         fprintf(stderr, "ngx_ev_loop_buckets bpf prog not found");
+        return ERR;
+    }
+
+    buckets_map_fd = bpf_object__find_map_fd_by_name(obj, "buckets_map");
+    if (buckets_map_fd == ERR) {
+        fprintf(stderr, "find map fd failed");
         return ERR;
     }
 
@@ -267,28 +276,40 @@ int prometheus_histogram_mode(struct bpf_object *obj)
         return ERR;
     }
 
-    buckets_map_fd = bpf_object__find_map_fd_by_name(obj, "buckets_map");
-    if (buckets_map_fd == ERR) {
-        fprintf(stderr, "find map fd failed");
-        return ERR;
-    }
 
     if (!arguments.quiet) {
         fprintf(stderr, "wait for 17 seconds; this is the prometheus histogram mode\nyou may want to use -c , -b , --help instead\n\n\n");
     }
 
-    sleep(17);
+    sleep(17);  /* Protmehteus agent scrape_interval: 20s
+                 * Eventually this should be a continuously running service
+                 * that exposes the metric on :port/metric
+                 * and deliver a target file to /etc/prometheus-agent/targets/
+                 * but be careful with long-running bpf programs, they can crash your kernel
+                 */
     fprintf(stdout, "# HELP nginx_event_loop_duration_usec Histogram of nginx event loop duration\n");
     fprintf(stdout, "# TYPE nginx_event_loop_duration_usec histogram\n");
 
-    __u32 key = 0, next_key;
-    __u64 value;
-    while (bpf_map_get_next_key(buckets_map_fd, &key, &next_key) == 0) {
-        bpf_map_lookup_elem(buckets_map_fd, &next_key, &value);
-        bucket_max = 1 << (next_key);
-        printf("nginx_event_loop_duration_usec_bucket{le=\"%u\"} %llu\n", bucket_max, value);
-        key = next_key;
+    __u64 cum = 0;
+
+     /* buckets_map array has 26 max entries
+      * so 2^26 microseconds ~ 33 seconds is the largest bucket
+      * and that's already way higher than critically large event loop duration
+      */
+    for ( __u32 i = 0 ; i < 26 ; i++ ) {
+        __u64 value;
+        bpf_map_lookup_elem(buckets_map_fd, &i, &value);
+        cum += value;
+        __u32 le = 1 << (i);
+        printf("nginx_event_loop_duration_usec_bucket{le=\"%u\"} %llu\n", le, cum);
     }
+    printf("nginx_event_loop_duration_usec_bucket{le=\"+Inf\"} %llu\n", cum);
+
+    /* a pid is removed from the start_map when it returns from ngx_epoll_process_events()
+     * so you want to check that map periodically, check for pids that have been in there too long
+     * then log some ustacks and increment a counter to alert on if the proc is still executing
+     * and hope that the ustacks you collected tell you why the worker was having such a long event loop
+     */
 
     close(buckets_map_fd);
     bpf_link__destroy(uprobe_link);
@@ -328,7 +349,8 @@ __u64 find_function_offset(const char *path, const char *func)
             goto failure;
 
         if (shdr.sh_type == SHT_SYMTAB) {
-//            fprintf(stderr, "Found symbol table: %s\n", sh_name);
+            if (!arguments.quiet)
+                fprintf(stderr, "Found symbol table: %s in %s\n", sh_name, path);
 
             Elf_Data *data = elf_getdata(scn, NULL);
             if (data == NULL)
@@ -351,12 +373,12 @@ __u64 find_function_offset(const char *path, const char *func)
 
                 if (GELF_ST_TYPE(sym.st_info) == STT_FUNC) {
 
-                    //printf("Function: %s, Offset: 0x%lx, Size: %lu\n", 
+                    //printf("Function: %s, Offset: 0x%lx, Size: %lu\n",
                     //       sym_name, sym.st_value, sym.st_size);
 
                     if (strcmp(sym_name, func) == 0) {
-                    //    printf("offset: 0x%lx\n", sym.st_value);
-                    //    printf("offset: %ld\n", sym.st_value);
+                        if (!arguments.quiet)
+                            fprintf(stderr, "%s offset: 0x%lx %ld\n",sym_name, sym.st_value, sym.st_value);
                         return sym.st_value;
                     }
                 }
