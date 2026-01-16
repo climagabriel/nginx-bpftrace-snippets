@@ -95,3 +95,5 @@ bpftrace -e 'uretprobe:/usr/sbin/nginx:ngx_quic_guard_allow_sendmsg {printf("%d\
 
 bpftrace -e 'tracepoint:syscalls:sys_enter_arch_prctl { printf("%s 0x%x\n", comm, args->option); }'
 
+timeout 10 bpftrace -e 'uretprobe:/opt/gcore/openresty12532-ssl352-gcdn/openssl352/lib/libssl.so.3:SSL_get_error { @[retval] = count(); }'
+
