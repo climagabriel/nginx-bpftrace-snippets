@@ -97,3 +97,4 @@ bpftrace -e 'tracepoint:syscalls:sys_enter_arch_prctl { printf("%s 0x%x\n", comm
 
 timeout 10 bpftrace -e 'uretprobe:/opt/gcore/openresty12532-ssl352-gcdn/openssl352/lib/libssl.so.3:SSL_get_error { @[retval] = count(); }'
 
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_shmtx_lock { @t[pid]=nsecs } uprobe:/usr/sbin/nginx:ngx_shmtx_unlock /@t[pid]/ { if(nsecs-@t[pid]>=10000000000){printf("pid %d held shmtx for %llums\n",pid,(nsecs-@t[pid])/1000000)} delete(@t[pid]) }'
