@@ -1,4 +1,8 @@
-# default max str() length is 64; raise with: BPFTRACE_MAX_STRLEN=256 bpftrace -e '...'
+# bpftrace string-length cap (default 64) — env var name depends on version:
+#   v0.14.x : BPFTRACE_STRLEN     (hard-capped at 200, BPF stack is 512B)
+#   v0.16+  : BPFTRACE_MAX_STRLEN (no hard cap)
+# This file uses BPFTRACE_STRLEN=200 for v0.14.x compat. Bump to
+# BPFTRACE_MAX_STRLEN=<N> on newer bpftrace if 200B is not enough.
 
 
 
@@ -8,7 +12,7 @@ bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_free { printf("%d\
 
 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc { printf("%d\n", pid); @count = count(); }'
 
-bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
 
 
 
@@ -16,9 +20,9 @@ bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc /comm == "n
 
 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream_connect { printf("%d\n", pid); }'
 
-bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream_connect { printf("%s\n", ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream_connect { printf("%s\n", ustack()); }'
 
-bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream* { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_upstream* { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
 
 bpftrace -e 'uretprobe:/root/nginx-gcdn/objs/nginx:ngx_http_upstream_cache {printf("%d\n", retval);}'
 
@@ -26,11 +30,11 @@ bpftrace -e 'uretprobe:/root/nginx-gcdn/objs/nginx:ngx_http_upstream_cache {prin
 
 ========== TCP / KERNEL ==========
 
-bpftrace -e 'kfunc:tcp_* /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'kfunc:tcp_* /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
 
 timeout 10 bpftrace -e 'kfunc:tcp_* /comm == "nginx"/ { @[probe] = count(); }'
 
-bpftrace -e 'kprobe:tcp_* /comm == "nc"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'kprobe:tcp_* /comm == "nc"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
 
 timeout 10 bpftrace -e 'kretprobe:tcp_sendmsg_locked /comm == "nginx"/ { @bytes = hist(retval); }'
 
@@ -46,7 +50,7 @@ timeout 10 bpftrace -e 'kfunc:native_queued_spin_lock_slowpath{ @[comm] = count(
 
 timeout 10 bpftrace -e 'kfunc:native_queued_spin_lock_slowpath{printf("%s\n",curtask->comm);}'
 
-bpftrace -e 'kprobe:native_queued_spin_lock_slowpath { @[kstack()] = count();}' -o traces
+BPFTRACE_STRLEN=200 bpftrace -e 'kprobe:native_queued_spin_lock_slowpath { @[kstack()] = count();}' -o traces
 
 timeout 10 bpftrace -e 'kfunc:_raw_spin_lock { @[comm] = count();}'
 
@@ -62,13 +66,13 @@ bpftrace -e 'kfunc:try_to_free_pages {printf("%s\n", comm);}'
 
 timeout 60 bpftrace -e 'kprobe:shrink_*active_list { @[probe] = count(); }'
 
-bpftrace -e 'kprobe:find_inode_fast { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'kprobe:find_inode_fast { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
 
 
 
 ========== NGINX SHMTX ==========
 
-timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_shmtx_lock { @[ustack(1)] = count();}'
+BPFTRACE_STRLEN=200 timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_shmtx_lock { @[ustack(1)] = count();}'
 
 timeout 60 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_get_variable { @[pid] = count();}'
 
@@ -82,21 +86,21 @@ timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_openat { @[comm] = count()
 
 bpftrace -e 'tracepoint:syscalls:sys_enter_rename {printf("%s %s\n", comm, probe);}'
 
-bpftrace -e 'tracepoint:syscalls:sys_enter_mkdir /comm == "nginx"/ {printf("%s\n", str(args->pathname));}'
+BPFTRACE_STRLEN=200 bpftrace -e 'tracepoint:syscalls:sys_enter_mkdir /comm == "nginx"/ {printf("%s\n", str(args->pathname));}'
 
-bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:__libc_open64 /comm == "nginx"/ {printf("%s\n", ustack());}'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:__libc_open64 /comm == "nginx"/ {printf("%s\n", ustack());}'
 
 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_open_cached_file { printf("%d %d\n", pid, tid); }'
 
 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_lock_wait { printf("%d\n", pid); }'
 
-bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire {printf("%s\n", ustack);}'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire {printf("%s\n", ustack);}'
 
-bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire { @calls = count(); $p = *(uint64*)(arg0+16); printf("%s\n", str(*(uint64*)($p+8), *(uint64*)$p)); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire { @calls = count(); $p = *(uint64*)(arg0+16); printf("%s\n", str(*(uint64*)($p+8), *(uint64*)$p)); }'
 
-bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_delete { @deletes = count(); printf("%s\n", str(arg2)); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_delete { @deletes = count(); printf("%s\n", str(arg2)); }'
 
-bpftrace -e 'tracepoint:syscalls:sys_enter_unlink /comm == "nginx"/ { @unlinks = count(); printf("%s\n", str(args->pathname)); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'tracepoint:syscalls:sys_enter_unlink /comm == "nginx"/ { @unlinks = count(); printf("%s\n", str(args->pathname)); }'
 
 
 
@@ -110,13 +114,13 @@ timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter*write* /comm == "nginx"/ {
 
 timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_writev /comm=="nginx"/ { @ = hist(args->vlen);}'
 
-bpftrace -e 'tracepoint:syscalls:sys_exit_close /comm == "nginx"/ { if (args->ret != 0) {printf(" %d %d %s %s %s\n ",args->ret , pid , comm, strftime("%H:%M:%S", nsecs), ustack); cat("/proc/%d/cmdline", pid);} }'
+BPFTRACE_STRLEN=200 bpftrace -e 'tracepoint:syscalls:sys_exit_close /comm == "nginx"/ { if (args->ret != 0) {printf(" %d %d %s %s %s\n ",args->ret , pid , comm, strftime("%H:%M:%S", nsecs), ustack); cat("/proc/%d/cmdline", pid);} }'
 
 bpftrace -e 'tracepoint:syscalls:sys_enter_arch_prctl { printf("%s 0x%x\n", comm, args->option); }'
 
 timeout 60 bpftrace -e 'tracepoint:raw_syscalls:sys_enter /comm == "nginx"/ { @[args->id] = count(); }'
 
-bpftrace -e 'tracepoint:syscalls:sys_enter* /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'tracepoint:syscalls:sys_enter* /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
 
 bpftrace --unsafe -e 'tracepoint:syscalls:sys_enter_write /comm == "nginx"/ { system("ls -l /proc/%d/fd/%d", pid, args->fd);}'
 
@@ -126,7 +130,7 @@ bpftrace --unsafe -e 'tracepoint:syscalls:sys_enter_write /comm == "nginx"/ { sy
 
 timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_connect /comm == "nginx"/ { if (args->uservaddr->sa_family == 2) { $s = (struct sockaddr_in *)args->uservaddr; $addr = ntop(2, $s->sin_addr.s_addr); @[$addr] = count(); } }'
 
-bpftrace -e 'tracepoint:syscalls:sys_enter_sendto /comm == "fastedge"/ { printf("pid=%d len=%d\n%r\n", pid, args->len, buf(args->buff, args->len)); }'
+BPFTRACE_STRLEN=200 bpftrace -e 'tracepoint:syscalls:sys_enter_sendto /comm == "fastedge"/ { printf("pid=%d len=%d\n%r\n", pid, args->len, buf(args->buff, args->len)); }'
 
 
 
