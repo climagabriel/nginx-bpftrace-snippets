@@ -1,3 +1,5 @@
+# default max str() length is 64; raise with: BPFTRACE_MAX_STRLEN=256 bpftrace -e '...'
+
 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_free { printf("%d\n", pid) }'
 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc { printf("%d\n", pid); @count = count(); }'
 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libtcmalloc.so.4:tc_malloc /comm == "nginx"/ { printf("%d %s %s\n %s\n", pid, comm, probe, ustack()); }'
@@ -36,7 +38,7 @@ bpftrace -e 'tracepoint:syscalls:sys_enter_mkdir /comm == "nginx"/ {printf("%s\n
 bpftrace -e 'uprobe:/lib/x86_64-linux-gnu/libc.so.6:__libc_open64 /comm == "nginx"/ {printf("%s\n", ustack());}'
 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_open_cached_file { printf("%d %d\n", pid, tid); }'
 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire {printf("%s\n", ustack);}'
-bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire { $p = *(uint64*)(arg0+16); printf("%s\n", str(*(uint64*)($p+8), *(uint64*)$p)); }'
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire { @calls = count(); $p = *(uint64*)(arg0+16); printf("%s\n", str(*(uint64*)($p+8), *(uint64*)$p)); }'
 
 timeout 60 bpftrace -e 'tracepoint:syscalls:sys_enter_pread64 /comm == "nginx"/ { @bytes = hist(args->count);}'
 timeout 60 bpftrace -e 'tracepoint:syscalls:sys_exit_epoll_wait /comm == "nginx"/ { @eventq[args->ret] = count(); }'
