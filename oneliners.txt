@@ -96,6 +96,8 @@ bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_forced_expire { @calls =
 
 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_delete { @deletes = count(); printf("%s\n", str(arg2)); }'
 
+bpftrace -e 'tracepoint:syscalls:sys_enter_unlink /comm == "nginx"/ { @unlinks = count(); printf("%s\n", str(args->pathname)); }'
+
 
 
 ========== SYSCALLS (MISC) ==========
