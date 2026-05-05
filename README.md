@@ -1,1 +1,0 @@
-oneliners.md
