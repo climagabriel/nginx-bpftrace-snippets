@@ -102,6 +102,10 @@ BPFTRACE_STRLEN=200 bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_http_file_cache_dele
 
 BPFTRACE_STRLEN=200 bpftrace -e 'tracepoint:syscalls:sys_enter_unlink /comm == "nginx"/ { @unlinks = count(); printf("%s\n", str(args->pathname)); }'
 
+bpftrace -e 'uprobe:/usr/sbin/nginx:ngx_directio_on { printf("%d\n", pid);}'
+
+bpftrace -e 'tracepoint:syscalls:sys_enter_fcntl /comm == "nginx"/ { printf("%d %s\n", pid, ustack); }'
+
 
 
 ========== SYSCALLS (MISC) ==========
